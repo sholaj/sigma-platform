@@ -1,0 +1,152 @@
+{
+  "folders": [
+    {
+      "name": "sigma-platform",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "files.eol": "\n",
+    "files.insertFinalNewline": true,
+    "files.trimTrailingWhitespace": true,
+    "files.exclude": {
+      "**/.git": true,
+      "**/.DS_Store": true,
+      "**/node_modules": true,
+      "**/.terraform": true,
+      "**/*.tfstate": true,
+      "**/*.tfstate.backup": true,
+      "**/.claude/cache": true,
+      "**/.claude/.local": true,
+      "**/.claude/settings.local.json": true
+    },
+    "search.exclude": {
+      "**/vendor": true,
+      "**/node_modules": true,
+      "**/.terraform": true,
+      "schemas/": true
+    },
+
+    "git.enableCommitSigning": true,
+    "git.requireGitUserConfig": true,
+    "git.suggestSmartCommit": false,
+    "git.useEditorAsCommitInput": true,
+
+    "telemetry.telemetryLevel": "off",
+    "redhat.telemetry.enabled": false,
+
+    "github.copilot.enable": {
+      "*": true,
+      "plaintext": false,
+      "scminput": false,
+      "yaml": true,
+      "markdown": true,
+      "terraform": true,
+      "go": true
+    },
+    "github.copilot.chat.codeGeneration.useInstructionFiles": true,
+    "github.copilot.chat.testGeneration.useInstructionFiles": true,
+    "github.copilot.chat.reviewSelection.useInstructionFiles": true,
+    "github.copilot.chat.commitMessageGeneration.instructions": [
+      {
+        "text": "Use Conventional Commits format. Allowed types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert, infra, gitops, policy, adr. Subject in sentence case. Do NOT append Co-Authored-By trailers."
+      }
+    ],
+
+    "yaml.schemas": {
+      "https://raw.githubusercontent.com/SchemaStore/schemastore/master/src/schemas/json/github-workflow.json": [
+        ".github/workflows/*.yml",
+        ".github/workflows/*.yaml"
+      ],
+      "https://raw.githubusercontent.com/SchemaStore/schemastore/master/src/schemas/json/github-action.json": [
+        ".github/actions/*/action.yml"
+      ],
+      "https://raw.githubusercontent.com/SchemaStore/schemastore/master/src/schemas/json/dependabot-2.0.json": [
+        ".github/dependabot.yml"
+      ],
+      "https://raw.githubusercontent.com/SchemaStore/schemastore/master/src/schemas/json/pre-commit-config.json": [
+        ".pre-commit-config.yaml"
+      ]
+    },
+    "yaml.format.enable": true,
+    "yaml.validate": true,
+    "yaml.completion": true,
+
+    "[terraform]": {
+      "editor.formatOnSave": true,
+      "editor.defaultFormatter": "hashicorp.terraform"
+    },
+    "[terraform-vars]": {
+      "editor.formatOnSave": true,
+      "editor.defaultFormatter": "hashicorp.terraform"
+    },
+
+    "[yaml]": {
+      "editor.formatOnSave": true,
+      "editor.defaultFormatter": "redhat.vscode-yaml",
+      "editor.tabSize": 2,
+      "editor.insertSpaces": true
+    },
+
+    "[markdown]": {
+      "files.trimTrailingWhitespace": false,
+      "editor.wordWrap": "on",
+      "editor.rulers": [80]
+    },
+
+    "[json]": {
+      "editor.formatOnSave": true,
+      "editor.defaultFormatter": "vscode.json-language-features"
+    },
+
+    "[shellscript]": {
+      "editor.formatOnSave": true,
+      "editor.tabSize": 2
+    },
+
+    "[go]": {
+      "editor.formatOnSave": true,
+      "editor.defaultFormatter": "golang.go",
+      "editor.codeActionsOnSave": {
+        "source.organizeImports": "explicit"
+      }
+    },
+
+    "shellcheck.run": "onSave",
+    "shellcheck.useWorkspaceRootAsCwd": true,
+
+    "go.useLanguageServer": true,
+    "go.lintTool": "golangci-lint",
+    "go.toolsManagement.autoUpdate": false,
+
+    "terraform.experimentalFeatures.validateOnSave": true,
+    "terraform.experimentalFeatures.prefillRequiredFields": true,
+
+    "kubernetes.outputFormat": "yaml",
+    "vscode-kubernetes.helm-path.mac": "/opt/homebrew/bin/helm",
+    "vscode-kubernetes.kubectl-path.mac": "/opt/homebrew/bin/kubectl",
+
+    "markdownlint.config": {
+      "extends": "./.markdownlint.json"
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "github.copilot",
+      "github.copilot-chat",
+      "anthropic.claude-code",
+      "redhat.vscode-yaml",
+      "hashicorp.terraform",
+      "ms-kubernetes-tools.vscode-kubernetes-tools",
+      "redhat.vscode-openshift-connector",
+      "editorconfig.editorconfig",
+      "davidanson.vscode-markdownlint",
+      "timonwong.shellcheck",
+      "golang.go",
+      "vivaxy.vscode-conventional-commits",
+      "ms-azuretools.vscode-azureresourcegroups",
+      "tamasfe.even-better-toml"
+    ],
+    "unwantedRecommendations": []
+  }
+}
