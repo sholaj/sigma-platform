@@ -38,3 +38,7 @@ Thumbs.db
 
 # Local research artifacts (e.g., compass artifacts from Claude research mode)
 compass_artifact_*.md
+
+# Terraform variable files often contain sub/tenant IDs and contact info
+*.tfvars
+!*.tfvars.example
