@@ -1,0 +1,40 @@
+# Agents & IDE caches that may contain client mentions in prompts/history
+.claude/settings.local.json
+.claude/cache/
+.claude/.local/
+.cursor/
+.copilot/cache/
+.vscode/
+.idea/
+*.iml
+
+# Secrets
+.env
+.env.*
+!.env.example
+.gitleaks.local.toml
+pull-secret*.txt
+*.kubeconfig
+kubeconfig
+
+# State
+*.tfstate
+*.tfstate.backup
+*.tfplan
+.terraform/
+.terraform.lock.hcl
+ansible.log
+*.retry
+
+# Build artifacts
+bin/
+dist/
+coverage.out
+*.test
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local research artifacts (e.g., compass artifacts from Claude research mode)
+compass_artifact_*.md

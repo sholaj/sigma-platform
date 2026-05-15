@@ -1,0 +1,23 @@
+---
+extends: default
+
+rules:
+  line-length:
+    max: 160
+    level: warning
+  comments:
+    min-spaces-from-content: 1
+  indentation:
+    spaces: 2
+    indent-sequences: true
+  truthy:
+    allowed-values: ["true", "false", "on"]
+  document-start:
+    present: true
+  empty-lines:
+    max: 2
+
+ignore: |
+  .terraform/
+  vendor/
+  node_modules/
