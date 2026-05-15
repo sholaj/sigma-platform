@@ -1,0 +1,48 @@
+---
+name: lint
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install pre-commit
+        run: pip install pre-commit
+
+      - name: Install hook-side tooling not bundled in pre-commit envs
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq shellcheck
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.21.0/gitleaks_8.21.0_linux_x64.tar.gz \
+            | sudo tar -xz -C /usr/local/bin gitleaks
+          sudo chmod +x /usr/local/bin/gitleaks
+
+      - name: Cache pre-commit envs
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: Run all hooks
+        run: pre-commit run --all-files --show-diff-on-failure
