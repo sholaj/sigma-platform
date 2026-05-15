@@ -1,0 +1,173 @@
+---
+name: nightly-teardown
+
+on:
+  schedule:
+    # Weekdays at 19:00 UTC — just past end-of-work for uksouth.
+    - cron: "0 19 * * 1-5"
+    # Saturday 06:00 UTC — belt-and-braces for anything missed Friday.
+    - cron: "0 6 * * 6"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "List what would be deleted but make no changes"
+        type: boolean
+        default: true
+      max_age_hours:
+        description: "Only delete RGs whose `created` tag is older than this many hours"
+        type: string
+        default: "12"
+
+permissions:
+  id-token: write
+  contents: read
+
+# Never let two teardowns interleave. cancel-in-progress is false here so
+# we don't abort a running deletion mid-cluster.
+concurrency:
+  group: nightly-teardown
+  cancel-in-progress: false
+
+env:
+  # Defence in depth: never delete anything matching this regex, even if
+  # tags are misconfigured.
+  PROTECTED_RG_PATTERN: "^rg-sigma-shared-"
+
+jobs:
+  nightly-teardown:
+    name: nightly-teardown
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Azure login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Resolve run mode (dry-run defaults to false on schedule, true on manual)
+        id: mode
+        env:
+          # workflow_dispatch sends inputs.dry_run = 'true' or 'false';
+          # schedule sends an empty string. We default to a SAFE NON-DESTRUCTIVE
+          # value when manually triggered (true) and DESTRUCTIVE when scheduled
+          # (false) — schedule is the intended teardown path.
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+          INPUT_AGE: ${{ inputs.max_age_hours }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            # Honour the input as-is
+            DRY_RUN="${INPUT_DRY_RUN:-true}"
+            MAX_AGE_HOURS="${INPUT_AGE:-12}"
+          else
+            # Scheduled: real teardown
+            DRY_RUN="false"
+            MAX_AGE_HOURS="12"
+          fi
+          echo "dry_run=${DRY_RUN}" >> "$GITHUB_OUTPUT"
+          echo "max_age_hours=${MAX_AGE_HOURS}" >> "$GITHUB_OUTPUT"
+          echo "Mode: dry_run=${DRY_RUN}, max_age_hours=${MAX_AGE_HOURS}, trigger=${EVENT_NAME}"
+
+      - name: Identify candidate resource groups
+        id: candidates
+        env:
+          MAX_AGE_HOURS: ${{ steps.mode.outputs.max_age_hours }}
+        run: |
+          set -euo pipefail
+
+          # Cutoff timestamp. Anything created BEFORE this is in scope.
+          CUTOFF=$(date -u -d "${MAX_AGE_HOURS} hours ago" +%Y-%m-%dT%H:%M:%SZ)
+          echo "Cutoff (UTC): $CUTOFF"
+
+          # ----- Tier 1: project-tagged RGs flagged for auto-destruction -----
+          mapfile -t project_rgs < <(az group list \
+            --query "[?tags.\"auto-destroy\"=='true' && tags.project=='sigma-platform' && tags.created<'$CUTOFF'].name" \
+            -o tsv)
+
+          # Apply the PROTECTED_RG_PATTERN as a hard exclusion.
+          target_rgs=()
+          for rg in "${project_rgs[@]:-}"; do
+            [ -z "$rg" ] && continue
+            if [[ "$rg" =~ $PROTECTED_RG_PATTERN ]]; then
+              echo "::warning::Skipping PROTECTED RG (matches \$PROTECTED_RG_PATTERN): $rg"
+              continue
+            fi
+            target_rgs+=("$rg")
+          done
+
+          # ----- Tier 2: orphan ARO-managed RGs -----
+          # When `az aro delete` hangs (a documented failure mode), the
+          # `aro-<domain>` managed RG can dangle after the operator RG is
+          # gone. Sweep them ONLY when no ARO clusters exist in the sub.
+          # If a cluster exists, its managed RG is in-use — never touch.
+          cluster_count=$(az aro list --query "length(@)" -o tsv 2>/dev/null || echo 0)
+          orphan_aro_rgs=()
+          if [ "$cluster_count" = "0" ]; then
+            mapfile -t orphan_aro_rgs < <(az group list \
+              --query "[?starts_with(name, 'aro-')].name" -o tsv)
+          else
+            echo "Skipping ARO-managed RG sweep — $cluster_count ARO cluster(s) still provisioned."
+          fi
+
+          # Persist
+          {
+            printf 'target_rgs<<EOF\n'
+            printf '%s\n' "${target_rgs[@]:-}" | sed '/^$/d'
+            printf 'EOF\n'
+            printf 'orphan_aro_rgs<<EOF\n'
+            printf '%s\n' "${orphan_aro_rgs[@]:-}" | sed '/^$/d'
+            printf 'EOF\n'
+          } >> "$GITHUB_OUTPUT"
+
+          echo ""
+          echo "Candidates:"
+          echo "  sigma-platform auto-destroy RGs (post-cutoff): ${#target_rgs[@]}"
+          for rg in "${target_rgs[@]:-}"; do [ -n "$rg" ] && echo "    - $rg"; done
+          echo "  orphan ARO-managed RGs: ${#orphan_aro_rgs[@]}"
+          for rg in "${orphan_aro_rgs[@]:-}"; do [ -n "$rg" ] && echo "    - $rg"; done
+
+      - name: Delete (or dry-run)
+        env:
+          DRY_RUN: ${{ steps.mode.outputs.dry_run }}
+          TARGET_RGS: ${{ steps.candidates.outputs.target_rgs }}
+          ORPHAN_ARO_RGS: ${{ steps.candidates.outputs.orphan_aro_rgs }}
+        run: |
+          set -euo pipefail
+          # Combine both lists (newline-separated, may be empty)
+          all=""
+          [ -n "$TARGET_RGS" ]     && all="$all$TARGET_RGS"$'\n'
+          [ -n "$ORPHAN_ARO_RGS" ] && all="$all$ORPHAN_ARO_RGS"$'\n'
+
+          if [ -z "$(printf '%s' "$all" | tr -d '[:space:]')" ]; then
+            echo "Nothing to delete."
+            exit 0
+          fi
+
+          printf '%s\n' "$all" | sed '/^$/d' | while IFS= read -r rg; do
+            # Re-check the protection pattern at delete time, belt-and-braces.
+            if [[ "$rg" =~ $PROTECTED_RG_PATTERN ]]; then
+              echo "::error::Refusing to delete PROTECTED RG: $rg"
+              continue
+            fi
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "DRY-RUN: would delete $rg"
+            else
+              echo "Deleting $rg (async)"
+              az group delete --name "$rg" --yes --no-wait
+            fi
+          done
+
+      - name: Month-to-date cost (informational)
+        if: always()
+        run: |
+          set -euo pipefail
+          start="$(date -u +%Y-%m-01)"
+          end="$(date -u +%Y-%m-%d)"
+          echo "Consumption $start → $end:"
+          az consumption usage list --start-date "$start" --end-date "$end" \
+            --query "[].pretaxCost" -o tsv 2>/dev/null \
+            | awk '{s+=$1} END {printf "  MTD pre-tax: %.2f\n", s+0}' \
+            || echo "(consumption data not yet available — typical for first 24-48h of the month)"
