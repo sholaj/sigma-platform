@@ -125,9 +125,13 @@ jobs:
           echo ""
           echo "Candidates:"
           echo "  sigma-platform auto-destroy RGs (post-cutoff): ${#target_rgs[@]}"
-          for rg in "${target_rgs[@]:-}"; do [ -n "$rg" ] && echo "    - $rg"; done
+          if [ ${#target_rgs[@]} -gt 0 ]; then
+            printf '    - %s\n' "${target_rgs[@]}"
+          fi
           echo "  orphan ARO-managed RGs: ${#orphan_aro_rgs[@]}"
-          for rg in "${orphan_aro_rgs[@]:-}"; do [ -n "$rg" ] && echo "    - $rg"; done
+          if [ ${#orphan_aro_rgs[@]} -gt 0 ]; then
+            printf '    - %s\n' "${orphan_aro_rgs[@]}"
+          fi
 
       - name: Delete (or dry-run)
         env:
