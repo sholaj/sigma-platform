@@ -1,0 +1,36 @@
+---
+version: '3'
+
+tasks:
+  unit:
+    desc: Go unit tests (tests/e2e and tests/terratest each carry their own go.mod)
+    cmds:
+      - |
+        set -euo pipefail
+        ran_any=false
+        for mod in tests/e2e tests/terratest; do
+          if [ -f "$mod/go.mod" ]; then
+            echo "==> go test $mod (short mode)"
+            ( cd "$mod" && go test -short -race ./... )
+            ran_any=true
+          fi
+        done
+        if [ "$ran_any" = "false" ]; then
+          echo "No tests/*/go.mod yet — Phase 5 will land them."
+        fi
+
+  e2e:
+    desc: Ginkgo e2e against a live ARO cluster (REQUIRES task aro:up:hub first)
+    cmds:
+      - |
+        set -euo pipefail
+        if [ ! -f tests/e2e/go.mod ]; then
+          echo "tests/e2e/go.mod not yet authored (Phase 5). Skipping."
+          exit 0
+        fi
+        # Sanity: require an oc context
+        if ! oc whoami >/dev/null 2>&1; then
+          echo "ERROR: not logged into an OpenShift cluster. Run 'oc login' first." >&2
+          exit 1
+        fi
+        ( cd tests/e2e && go test -race -timeout 30m ./... )

@@ -1,0 +1,107 @@
+---
+version: '3'
+
+vars:
+  HUB_RG: rg-sigma-hub-uksouth
+  VIRT_RG: rg-sigma-virt-uksouth
+  HUB_CLUSTER: aro-hub-01
+  VIRT_CLUSTER: aro-virt-01
+
+tasks:
+  assert-none-running:
+    desc: Fail if any ARO cluster is provisioned (enforces ADR 0005 one-at-a-time invariant)
+    silent: true
+    cmds:
+      - |
+        set -euo pipefail
+        count=$(az aro list \
+          --query "length([?provisioningState=='Succeeded' || provisioningState=='Creating'])" \
+          -o tsv 2>/dev/null || echo 0)
+        if [ "$count" -gt 0 ]; then
+          echo "ERROR: $count ARO cluster(s) already provisioned. Run 'task spin:down:all' first." >&2
+          az aro list \
+            --query "[].{name:name, rg:resourceGroup, state:provisioningState}" \
+            -o table >&2
+          exit 1
+        fi
+
+  up:hub:
+    desc: terraform apply for hub ARO (BLOCKED on vCPU quota request)
+    dir: '{{.TF_HUB_DIR}}'
+    cmds:
+      - |
+        if [ ! -f main.tf ]; then
+          echo "ERROR: {{.TF_HUB_DIR}}/main.tf not authored yet (Phase 1 quota-blocked work)." >&2
+          exit 1
+        fi
+      - terraform init -input=false
+      - terraform plan -input=false -out=tfplan
+      - terraform apply -input=false tfplan
+
+  up:virt:
+    desc: terraform apply for virt ARO (BLOCKED on vCPU + Dsv5 quota)
+    dir: '{{.TF_VIRT_DIR}}'
+    cmds:
+      - |
+        if [ ! -f main.tf ]; then
+          echo "ERROR: {{.TF_VIRT_DIR}}/main.tf not authored yet (Phase 1 quota-blocked work)." >&2
+          exit 1
+        fi
+      - terraform init -input=false
+      - terraform plan -input=false -out=tfplan
+      - terraform apply -input=false tfplan
+
+  down:hub:
+    desc: Destroy hub ARO + its RG (best-effort, idempotent)
+    cmds:
+      - |
+        set -uo pipefail
+        if [ -d "{{.TF_HUB_DIR}}" ] && [ -f "{{.TF_HUB_DIR}}/main.tf" ]; then
+          ( cd "{{.TF_HUB_DIR}}" && terraform destroy -auto-approve -input=false ) || true
+        fi
+        # Fallback: nuke the RG directly in case state is corrupt.
+        az group delete --name "{{.HUB_RG}}" --yes --no-wait --only-show-errors 2>/dev/null || true
+        # ARO-managed RG (aro-<domain>) for the hub cluster, if dangling.
+        managed=$(az aro show -g "{{.HUB_RG}}" -n "{{.HUB_CLUSTER}}" --query clusterProfile.domain -o tsv 2>/dev/null || true)
+        if [ -n "${managed:-}" ]; then
+          az group delete --name "aro-${managed}" --yes --no-wait --only-show-errors 2>/dev/null || true
+        fi
+
+  down:virt:
+    desc: Destroy virt ARO + its RG (best-effort, idempotent)
+    cmds:
+      - |
+        set -uo pipefail
+        if [ -d "{{.TF_VIRT_DIR}}" ] && [ -f "{{.TF_VIRT_DIR}}/main.tf" ]; then
+          ( cd "{{.TF_VIRT_DIR}}" && terraform destroy -auto-approve -input=false ) || true
+        fi
+        az group delete --name "{{.VIRT_RG}}" --yes --no-wait --only-show-errors 2>/dev/null || true
+        managed=$(az aro show -g "{{.VIRT_RG}}" -n "{{.VIRT_CLUSTER}}" --query clusterProfile.domain -o tsv 2>/dev/null || true)
+        if [ -n "${managed:-}" ]; then
+          az group delete --name "aro-${managed}" --yes --no-wait --only-show-errors 2>/dev/null || true
+        fi
+
+  sweep-orphans:
+    desc: Delete any sigma-platform RG tagged auto-destroy=true older than 12h (local equivalent of nightly-teardown)
+    silent: true
+    cmds:
+      - |
+        set -euo pipefail
+        cutoff="$(date -u -d '12 hours ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-12H +%Y-%m-%dT%H:%M:%SZ)"
+        mapfile -t rgs < <(az group list \
+          --query "[?tags.project=='sigma-platform' && tags.\"auto-destroy\"=='true' && tags.created<'$cutoff'].name" \
+          -o tsv 2>/dev/null)
+        for rg in "${rgs[@]:-}"; do
+          [ -z "$rg" ] && continue
+          if [[ "$rg" =~ ^rg-sigma-shared- ]]; then
+            echo "Skipping PROTECTED $rg"; continue
+          fi
+          echo "Deleting orphan $rg"
+          az group delete --name "$rg" --yes --no-wait --only-show-errors
+        done
+
+  status:
+    desc: Show provisioned ARO clusters in this subscription
+    silent: true
+    cmds:
+      - az aro list --query "[].{name:name, rg:resourceGroup, state:provisioningState, version:clusterProfile.version}" -o table

@@ -1,0 +1,59 @@
+---
+version: '3'
+
+vars:
+  KIND_CLUSTER: sigma-kv
+  CILIUM_VERSION: 1.19.4
+
+tasks:
+  up:
+    desc: Bring up the local kind cluster with Cilium + KubeVirt + Forklift (Phase 2/4)
+    cmds:
+      - |
+        if ! command -v kind >/dev/null 2>&1; then
+          echo "ERROR: kind not installed. 'brew install kind'." >&2
+          exit 1
+        fi
+      - kind create cluster --name {{.KIND_CLUSTER}} || true
+      - task: kind:install-cilium
+      - task: kind:install-kubevirt
+      - task: kind:install-forklift
+
+  down:
+    desc: Destroy the local kind cluster
+    cmds:
+      - kind delete cluster --name {{.KIND_CLUSTER}} || true
+
+  install-cilium:
+    desc: Install Cilium 1.19 on kind via the upstream Helm chart (NOT OLM — that is OpenShift only)
+    cmds:
+      - helm repo add cilium https://helm.cilium.io/ || true
+      - helm repo update
+      - helm upgrade --install cilium cilium/cilium
+          --version {{.CILIUM_VERSION}}
+          --namespace kube-system
+          --set image.pullPolicy=IfNotPresent
+          --set ipam.mode=kubernetes
+
+  install-kubevirt:
+    desc: Install KubeVirt + CDI on kind in software-emulation mode (Phase 4)
+    cmds:
+      - |
+        set -euo pipefail
+        KV_VERSION=$(curl -s https://api.github.com/repos/kubevirt/kubevirt/releases/latest | jq -r .tag_name)
+        echo "Installing KubeVirt $KV_VERSION"
+        kubectl apply -f "https://github.com/kubevirt/kubevirt/releases/download/${KV_VERSION}/kubevirt-operator.yaml"
+        kubectl apply -f "https://github.com/kubevirt/kubevirt/releases/download/${KV_VERSION}/kubevirt-cr.yaml"
+        # Software emulation (kind nodes don't expose nested virt by default)
+        kubectl -n kubevirt patch kubevirt kubevirt --type=merge \
+          --patch '{"spec":{"configuration":{"developerConfiguration":{"useEmulation":true}}}}'
+        CDI_VERSION=$(curl -s https://api.github.com/repos/kubevirt/containerized-data-importer/releases/latest | jq -r .tag_name)
+        echo "Installing CDI $CDI_VERSION"
+        kubectl apply -f "https://github.com/kubevirt/containerized-data-importer/releases/download/${CDI_VERSION}/cdi-operator.yaml"
+        kubectl apply -f "https://github.com/kubevirt/containerized-data-importer/releases/download/${CDI_VERSION}/cdi-cr.yaml"
+
+  install-forklift:
+    desc: Install Forklift (upstream MTV) on kind (Phase 4)
+    cmds:
+      - kubectl create namespace konveyor-forklift --dry-run=client -o yaml | kubectl apply -f -
+      - kubectl apply -f https://github.com/kubev2v/forklift/releases/latest/download/operator.yaml

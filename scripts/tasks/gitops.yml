@@ -1,0 +1,35 @@
+---
+version: '3'
+
+tasks:
+  bootstrap:hub:
+    desc: Install OpenShift GitOps + apply the root Application on the hub (Phase 2)
+    cmds:
+      - |
+        if ! oc whoami >/dev/null 2>&1; then
+          echo "ERROR: not logged into the hub cluster. Run 'oc login' first (creds via 'az aro list-credentials -g rg-sigma-hub-uksouth -n aro-hub-01')." >&2
+          exit 1
+        fi
+        if [ ! -d gitops/bootstrap ]; then
+          echo "ERROR: gitops/bootstrap/ not authored yet (Phase 2)." >&2
+          exit 1
+        fi
+        echo "==> installing OpenShift GitOps operator"
+        oc apply -f gitops/bootstrap/openshift-gitops-subscription.yaml
+        echo "==> waiting for openshift-gitops namespace to settle (~60s)"
+        oc wait --for=condition=Ready --timeout=120s ns/openshift-gitops || true
+        echo "==> applying root Application"
+        oc apply -f gitops/bootstrap/root-application.yaml
+
+  register-spoke:
+    desc: Import the local kind cluster into ACM as a ManagedCluster (Phase 3)
+    cmds:
+      - |
+        if ! command -v clusteradm >/dev/null 2>&1; then
+          echo "ERROR: clusteradm not on PATH." >&2
+          echo "Install via 'brew install open-cluster-management/tap/clusteradm'" >&2
+          echo "or download from https://github.com/open-cluster-management-io/clusteradm/releases" >&2
+          exit 1
+        fi
+        echo "TODO Phase 3 — run 'clusteradm join' against the hub, then 'oc apply -f gitops/bootstrap/managed-cluster-kind.yaml' on the hub."
+        exit 1
