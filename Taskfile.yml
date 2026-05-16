@@ -1,0 +1,114 @@
+---
+version: '3'
+
+vars:
+  PROJECT: sigma-platform
+  REGION: uksouth
+  KUBE_VERSION: 1.30.0
+  TF_SHARED_DIR: infra/terraform/envs/shared
+  TF_HUB_DIR: infra/terraform/envs/hub
+  TF_VIRT_DIR: infra/terraform/envs/virt
+  TF_BASTION_DIR: infra/terraform/envs/bastion
+
+env:
+  TF_IN_AUTOMATION: '1'
+  AZURE_CORE_OUTPUT: 'table'
+
+includes:
+  setup: ./scripts/tasks/setup.yml
+  lint: ./scripts/tasks/lint.yml
+  test: ./scripts/tasks/test.yml
+  cost: ./scripts/tasks/cost.yml
+  aro: ./scripts/tasks/aro.yml
+  gitops: ./scripts/tasks/gitops.yml
+  kind: ./scripts/tasks/kind.yml
+
+tasks:
+  default:
+    desc: List available tasks
+    silent: true
+    cmds:
+      - task --list-all
+
+  # ---------------------------------------------------------------------------
+  # Workstation bootstrap
+  # ---------------------------------------------------------------------------
+
+  bootstrap:
+    desc: One-time workstation setup (verify tools, install pre-commit hooks)
+    cmds:
+      - task: setup:check-tools
+      - task: setup:install-hooks
+
+  # ---------------------------------------------------------------------------
+  # Lint + validate
+  # ---------------------------------------------------------------------------
+
+  lint:
+    desc: Run all linters (yaml, terraform, shell, markdown)
+    cmds:
+      - task: lint:yaml
+      - task: lint:terraform
+      - task: lint:shell
+      - task: lint:markdown
+
+  validate:
+    desc: Schema-validate every manifest in the repo (lenient — warns on missing schemas)
+    cmds:
+      - task: lint:kubeconform
+      - task: lint:kube-linter
+      - task: lint:kustomize-build
+
+  validate:strict:
+    desc: CI-equivalent strict schema validation (fails on missing schemas)
+    cmds:
+      - bash scripts/lint/kubeconform.sh --strict
+
+  anon:scan:
+    desc: Run the anonymisation scan against staged changes (gitleaks public + private merged)
+    cmds:
+      - bash scripts/lint/anon-scan.sh
+
+  # ---------------------------------------------------------------------------
+  # Spin up / down — chained workflows that combine cost guards, Terraform,
+  # and GitOps bootstrap. THESE COST MONEY when applied.
+  # ---------------------------------------------------------------------------
+
+  spin:up:hub:
+    desc: Provision the hub ARO cluster + bootstrap GitOps (COSTS ≈£2.40/hr)
+    prompt: This will provision the hub ARO cluster (~£2.40/hr while running). Continue?
+    deps:
+      - cost:precheck
+      - aro:assert-none-running
+    cmds:
+      - task: aro:up:hub
+      - task: gitops:bootstrap:hub
+      - echo "Hub cluster is up. Run 'task spin:down:all' at end of day."
+
+  spin:up:virt:
+    desc: Provision the virt ARO cluster (COSTS ≈£2.40/hr; hub MUST be down first)
+    prompt: This will provision the virt ARO cluster (~£2.40/hr). Hub must already be torn down. Continue?
+    deps:
+      - cost:precheck
+      - aro:assert-none-running
+    cmds:
+      - task: aro:up:virt
+      - echo "Virt cluster is up. Multi-cluster ACM not exercised in virt mode (hub is down). Run 'task spin:down:all' at end of day."
+
+  spin:down:all:
+    desc: Destroy everything Azure (DEFAULT END-OF-DAY)
+    cmds:
+      - task: aro:down:virt
+      - task: aro:down:hub
+      - task: aro:sweep-orphans
+      - echo "Teardown complete."
+
+  # ---------------------------------------------------------------------------
+  # Misc maintenance
+  # ---------------------------------------------------------------------------
+
+  sync-agent-context:
+    desc: Keep CLAUDE.md and AGENTS.md aligned (AGENTS.md is a stub pointing at CLAUDE.md, so no-op today)
+    silent: true
+    cmds:
+      - grep -q "See \[\`CLAUDE.md\`\]" AGENTS.md && echo "AGENTS.md already points at CLAUDE.md." || echo "AGENTS.md is out of sync — investigate."

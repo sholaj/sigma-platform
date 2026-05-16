@@ -1,0 +1,61 @@
+---
+version: '3'
+
+tasks:
+  # Language-specific lint sub-tasks route through pre-commit so they reuse
+  # the pinned tool versions in .pre-commit-config.yaml rather than relying
+  # on whatever happens to be on PATH. Run `task lint` to chain them all.
+
+  yaml:
+    desc: yamllint via pre-commit (uses the pinned env)
+    cmds:
+      - pre-commit run yamllint --all-files
+
+  terraform:
+    desc: terraform fmt -check + terraform validate across every infra/terraform/envs/* directory
+    cmds:
+      - |
+        set -euo pipefail
+        terraform fmt -check -recursive infra/terraform/
+        for d in infra/terraform/envs/*/; do
+          [ -d "$d" ] || continue
+          [ -f "$d/main.tf" ] || continue
+          echo "==> terraform validate in $d"
+          ( cd "$d" && terraform init -backend=false -input=false >/dev/null && terraform validate )
+        done
+
+  shell:
+    desc: shellcheck via pre-commit
+    cmds:
+      - pre-commit run shellcheck --all-files
+
+  markdown:
+    desc: markdownlint via pre-commit
+    cmds:
+      - pre-commit run markdownlint --all-files
+
+  kubeconform:
+    desc: kubeconform across manifests in gitops/, clusters/, policies/
+    cmds:
+      - bash scripts/lint/kubeconform.sh
+
+  kube-linter:
+    desc: kube-linter best-practice checks across manifests
+    cmds:
+      - bash scripts/lint/kube-linter.sh
+
+  kustomize-build:
+    desc: kustomize build every overlay through kubeconform
+    cmds:
+      - |
+        set -euo pipefail
+        shopt -s nullglob
+        overlays=(gitops/overlays/*/)
+        if [ ${#overlays[@]} -eq 0 ]; then
+          echo "No gitops/overlays/* yet — skipping."
+          exit 0
+        fi
+        for overlay in "${overlays[@]}"; do
+          echo "==> $overlay"
+          kustomize build "$overlay" | kubeconform -strict -ignore-missing-schemas -summary -
+        done

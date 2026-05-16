@@ -1,0 +1,38 @@
+---
+version: '3'
+
+tasks:
+  check-tools:
+    desc: Verify expected CLI tools are installed
+    silent: true
+    cmds:
+      - |
+        missing=0
+        for t in gh git az terraform kubectl oc helm kustomize jq python3 \
+                 pre-commit yamllint gitleaks kubeconform kube-linter task gpg; do
+          if command -v "$t" >/dev/null 2>&1; then
+            printf "  %-14s OK\n" "$t"
+          else
+            printf "  %-14s MISSING\n" "$t"
+            missing=$((missing+1))
+          fi
+        done
+        if [ $missing -gt 0 ]; then
+          echo ""
+          echo "$missing tool(s) missing. Install on macOS with:"
+          echo "  brew install pre-commit go-task yamllint gitleaks kubeconform kube-linter gh terraform azure-cli jq gnupg kubectl helm kustomize"
+          echo "  brew install --cask docker  # if you'll use kind"
+          exit 1
+        fi
+
+  install-hooks:
+    desc: Install pre-commit hooks (pre-commit + commit-msg)
+    cmds:
+      - pre-commit install --install-hooks
+      - pre-commit install --hook-type commit-msg
+
+  fetch-schemas:
+    desc: "Fetch CRD schemas for kubeconform (Phase 2+; OpenShift CRDs not in datreeio catalogue)"
+    cmds:
+      - echo "TODO Phase 2 — fetch CiliumConfig, HyperConverged, Provider, Plan CRDs into schemas/"
+      - echo "See runbook §5.5 for the source URLs."

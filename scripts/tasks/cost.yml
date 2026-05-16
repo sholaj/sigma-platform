@@ -1,0 +1,57 @@
+---
+version: '3'
+
+vars:
+  BUDGET_GBP: 500
+  WARN_PCT: 80
+
+tasks:
+  status:
+    desc: Show current month spend and any active ARO clusters
+    silent: true
+    cmds:
+      - |
+        set -euo pipefail
+        start="$(date -u +%Y-%m-01)"
+        end="$(date -u +%Y-%m-%d)"
+        echo "--- consumption $start → $end ---"
+        mtd=$(az consumption usage list \
+          --start-date "$start" --end-date "$end" \
+          --query "[].pretaxCost" -o tsv 2>/dev/null \
+          | awk '{s+=$1} END {printf "%.2f", s+0}')
+        printf "  MTD pre-tax: £%s of £%s budget\n" "${mtd:-0.00}" "{{.BUDGET_GBP}}"
+        echo ""
+        echo "--- active ARO clusters ---"
+        az aro list \
+          --query "[].{name:name, rg:resourceGroup, state:provisioningState}" \
+          -o table 2>/dev/null \
+          || echo "(none)"
+        echo ""
+        echo "--- sigma-platform RGs with auto-destroy=true ---"
+        az group list \
+          --query "[?tags.project=='sigma-platform' && tags.\"auto-destroy\"=='true'].{name:name, created:tags.created}" \
+          -o table 2>/dev/null
+
+  precheck:
+    desc: Refuse to spin up a cluster if month-to-date spend exceeds the warn threshold
+    silent: true
+    cmds:
+      - |
+        set -euo pipefail
+        start="$(date -u +%Y-%m-01)"
+        end="$(date -u +%Y-%m-%d)"
+        mtd=$(az consumption usage list \
+          --start-date "$start" --end-date "$end" \
+          --query "[].pretaxCost" -o tsv 2>/dev/null \
+          | awk '{s+=$1} END {printf "%.2f", s+0}')
+        mtd=${mtd:-0}
+        budget={{.BUDGET_GBP}}
+        warn={{.WARN_PCT}}
+        threshold=$(echo "$budget * $warn / 100" | bc -l)
+        over=$(echo "$mtd > $threshold" | bc -l)
+        printf "MTD pre-tax: £%s; warn threshold £%s (%d%% of £%s).\n" "$mtd" "$threshold" "$warn" "$budget"
+        if [ "$over" = "1" ]; then
+          echo "ERROR: month-to-date spend is over the warn threshold; refusing to spin up a new cluster." >&2
+          exit 1
+        fi
+        echo "OK — clear to provision."
