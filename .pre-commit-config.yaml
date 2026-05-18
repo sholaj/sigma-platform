@@ -45,6 +45,23 @@ repos:
     hooks:
       - id: conventional-pre-commit
         stages: [commit-msg]
+        # Default types plus this project's domain types from runbook §9.4.
+        args:
+          - feat
+          - fix
+          - docs
+          - style
+          - refactor
+          - perf
+          - test
+          - build
+          - ci
+          - chore
+          - revert
+          - infra
+          - gitops
+          - policy
+          - adr
 
   - repo: local
     hooks:

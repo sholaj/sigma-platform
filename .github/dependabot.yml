@@ -1,0 +1,63 @@
+---
+version: 2
+
+updates:
+  # GitHub Actions — bumps the SHA-pinned actions in .github/workflows/*.yml.
+  # The action references use the form `@<sha> # vN`; Dependabot updates
+  # the SHA and the trailing comment together when a new version lands.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+      timezone: Europe/London
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+      include: scope
+    groups:
+      gh-actions:
+        patterns:
+          - "*"
+
+  # Terraform providers — bumps versions in
+  # infra/terraform/envs/*/versions.tf and any module versions.tf.
+  - package-ecosystem: terraform
+    directory: /infra/terraform/envs/shared
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+      timezone: Europe/London
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "infra"
+      include: scope
+
+  # Go modules — once tests/e2e/go.mod and tests/terratest/go.mod exist
+  # (Phase 5), Dependabot will start tracking them. Currently silently
+  # skipped because neither directory has a go.mod.
+  - package-ecosystem: gomod
+    directory: /tests/e2e
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+      timezone: Europe/London
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "test"
+      include: scope
+
+  - package-ecosystem: gomod
+    directory: /tests/terratest
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+      timezone: Europe/London
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "test"
+      include: scope
