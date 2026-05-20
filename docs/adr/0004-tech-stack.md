@@ -33,7 +33,7 @@ Chosen stack (locked):
 - **Container platform**: OpenShift 4.20 (ARO for the live lab
   cluster; bare-metal patterns codified as reference manifests).
 - **CNI**: Cilium 1.19 on local kind (Helm); ARO clusters retain
-  their managed OVN-Kubernetes. See ADR 0007.
+  their managed OVN-Kubernetes. See ADR 0008.
 - **GitOps**: ArgoCD via the OpenShift GitOps Operator.
 - **Multi-cluster**: Red Hat ACM on the ARO hub, with a local kind
   cluster imported as the spoke.
@@ -49,7 +49,7 @@ Chosen stack (locked):
 - Good: every choice has a direct analogue in the production target.
 - Good: Go-based test stack reuses the operator's existing skill set.
 - Bad: Cilium is exercised on kind only — the OLM-on-OpenShift install
-  surface is left as reference. See ADR 0007.
+  surface is left as reference. See ADR 0008.
 - Bad: Bare-metal-only features (PTP, SR-IOV, ACI integration) are
   documentation, not exercise.
 
@@ -61,4 +61,4 @@ require a tool outside this list, that's a re-open of this ADR.
 ## Links
 
 - ADR 0005 (one-cluster-at-a-time topology)
-- ADR 0007 (Cilium scope split)
+- ADR 0008 (Cilium scope split)

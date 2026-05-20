@@ -22,7 +22,7 @@ on ARO — those exist only for self-managed OpenShift (IPI/UPI/Assisted).
 Therefore, in this repository:
 
 1. **Live Cilium experimentation runs on the local kind cluster only.**
-   See `scripts/kind/up.sh` and ADR 0007. The kind cluster installs
+   See `scripts/kind/up.sh` and ADR 0008. The kind cluster installs
    Cilium via the standard Helm chart (NOT the OLM operator — OLM is
    OpenShift-only).
 2. **Cilium-on-OpenShift manifests for the bare-metal target live in
@@ -77,15 +77,22 @@ helm install cilium cilium/cilium \
   --set ipam.mode=kubernetes
 ```
 
-## ACI underlay considerations (theory, ADR 0007)
+## ACI underlay considerations (theory — ADR TBD)
 
-ACI is not present in any lab cluster. Document the production design
-in `docs/adr/0007-cilium-aci-underlay.md` and capture policy patterns
-that would translate cleanly to bare-metal:
+ACI is not present in any lab cluster. The production design has not
+yet been formally captured as an ADR (the original placeholder
+"ADR 0007" was claimed by the branch-protection decision; a dedicated
+ACI underlay ADR is on the backlog for Phase 6).
+
+When that ADR is written, it should capture policy patterns that
+translate cleanly to bare-metal:
 
 - BGP advertisement of pod CIDRs (Cilium BGP control plane)
 - Per-namespace egress IP pools
 - DSR for north-south traffic
+
+Until then, treat any ACI integration discussion in PRs as
+design-intent material requiring its own ADR before manifests land.
 
 ## Day-2 (bare-metal reference)
 
