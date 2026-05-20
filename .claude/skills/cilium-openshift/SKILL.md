@@ -5,8 +5,10 @@ description: |
   1.19 via the Isovalent OLM operator, CiliumConfig CRs,
   CiliumNetworkPolicy, CiliumClusterwideNetworkPolicy, Hubble, eBPF
   datapath choices, native routing CIDRs, or the cluster bootstrap
-  flow. Also use when the user mentions Cisco ACI underlay
-  considerations or BGP peering with the fabric.
+  flow. Fabric-specific underlay patterns (ACI integration, BGP
+  peering with a physical fabric, EVPN designs) are explicitly out of
+  scope for this reference repo — see the "Out of scope" section of
+  the skill body and redirect the user accordingly.
 ---
 
 # Cilium 1.19 on OpenShift 4.20
@@ -77,22 +79,26 @@ helm install cilium cilium/cilium \
   --set ipam.mode=kubernetes
 ```
 
-## ACI underlay considerations (theory — ADR TBD)
+## Out of scope: fabric-specific underlay patterns
 
-ACI is not present in any lab cluster. The production design has not
-yet been formally captured as an ADR (the original placeholder
-"ADR 0007" was claimed by the branch-protection decision; a dedicated
-ACI underlay ADR is on the backlog for Phase 6).
+ACI integration, BGP peering with a physical fabric, EVPN designs,
+route-leak topologies, and similar fabric-specific underlay patterns
+are not in scope for this reference repo. The reasoning:
 
-When that ADR is written, it should capture policy patterns that
-translate cleanly to bare-metal:
+- These designs are heavily site- and vendor-specific. A useful ADR
+  would have to capture real VRFs, real CIDR allocations, real peering
+  topology — none of which can survive this repo's anonymisation
+  posture (ADR 0001) without being stripped of the detail that makes
+  them useful.
+- The lab has no physical fabric to exercise against; kind and ARO
+  both abstract the underlay away entirely.
+- A "generic patterns" ADR (BGP advertisement of pod CIDRs, egress IP
+  pools, DSR for north-south) is too thin to be load-bearing.
 
-- BGP advertisement of pod CIDRs (Cilium BGP control plane)
-- Per-namespace egress IP pools
-- DSR for north-south traffic
-
-Until then, treat any ACI integration discussion in PRs as
-design-intent material requiring its own ADR before manifests land.
+If a user asks for ACI / EVPN / fabric-BGP work, tell them this is
+out of scope here and that the right place for the design is a private
+ADR in the project that consumes this reference. Do not generate
+manifests or pseudo-design content in this repo.
 
 ## Day-2 (bare-metal reference)
 
