@@ -1,0 +1,21 @@
+---
+# podinfo base — minimal Kustomize artefact for the Phase-2 GitOps
+# demonstrator. The overlay at gitops/overlays/podinfo/ is what gets
+# applied; the base only exists as a reusable starting point.
+#
+# Image version (6.12.0) matches the Helm install documented in
+# docs/cilium-learning-cluster.md so engineers see the same UI when
+# comparing the two install paths side by side.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - deployment.yaml
+  - service.yaml
+
+labels:
+  - includeSelectors: true
+    pairs:
+      app.kubernetes.io/name: podinfo
+      app.kubernetes.io/part-of: sigma-platform

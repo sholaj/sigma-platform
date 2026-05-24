@@ -1,0 +1,30 @@
+---
+# podinfo overlay — Phase-2 GitOps demonstrator.
+#
+# Lives at the same depth as future overlays (sibling to whatever
+# Phase-3 ACM ApplicationSet ends up producing for the kind spoke).
+# kustomize-build.sh globs gitops/overlays/*/ so the overlay name is
+# what `task lint:kustomize-build` keys on.
+#
+# This overlay demonstrates two pieces of Kustomize-on-top-of-base
+# behaviour:
+#
+#   1. `replicas` typed transform — bumps the deployment from 2 to 3
+#      without a strategic merge patch.
+#   2. An overlay-only label that does NOT propagate into selectors,
+#      so re-applying the overlay never causes a Deployment-selector
+#      immutability error.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../apps/podinfo
+
+replicas:
+  - name: podinfo
+    count: 3
+
+labels:
+  - includeSelectors: false
+    pairs:
+      sigma-platform.io/overlay: podinfo
