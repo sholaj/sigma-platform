@@ -55,7 +55,11 @@ tasks:
           --set hubble.enabled=true
           --set hubble.relay.enabled=true
           --set hubble.ui.enabled=true
-      - kubectl -n kube-system rollout status ds/cilium --timeout=300s
+      # 600s (not 300s) because the first cilium agent image pull on a cold
+      # Docker daemon can take 5+ min on its own — observed 6m12s on a
+      # fresh Docker Desktop start. The cluster is fine; only the wait
+      # was too tight.
+      - kubectl -n kube-system rollout status ds/cilium --timeout=600s
 
   cilium-status:
     desc: Print Cilium status from the cilium-dbg shipped with the daemonset
