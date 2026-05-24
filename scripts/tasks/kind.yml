@@ -3,26 +3,44 @@ version: '3'
 
 vars:
   KIND_CLUSTER: sigma-kv
+  KIND_CONFIG: clusters/kind-local/kind-config.yaml
   CILIUM_VERSION: 1.19.4
 
 tasks:
-  up:
-    desc: Bring up the local kind cluster with Cilium + KubeVirt + Forklift (Phase 2/4)
+  # Default entrypoint for Cilium learning loops. Fast: just the kind
+  # cluster + Cilium + Hubble. Use this when iterating on
+  # CiliumNetworkPolicy, watching Hubble flows, or working through the
+  # Phase-2 roadmap. See docs/adr/0009-kind-cilium-learning-cluster.md.
+  up:cilium:
+    desc: Bring up the kind cluster with Cilium + Hubble only (fast — Phase 2)
+    cmds:
+      - task: ensure-kind
+      - kind create cluster --name {{.KIND_CLUSTER}} --config {{.KIND_CONFIG}} || true
+      - task: install-cilium
+
+  # Full bundle for the Phase-4 KubeVirt + MTV exercises. Slower:
+  # pulls KubeVirt + CDI + Forklift operators on top of Cilium.
+  up:full:
+    desc: Bring up the kind cluster with Cilium + KubeVirt + Forklift (Phase 4)
+    cmds:
+      - task: up:cilium
+      - task: install-kubevirt
+      - task: install-forklift
+
+  down:
+    desc: Destroy the local kind cluster
+    cmds:
+      - kind delete cluster --name {{.KIND_CLUSTER}} || true
+
+  ensure-kind:
+    desc: Fail fast with a useful message if kind isn't on PATH
+    silent: true
     cmds:
       - |
         if ! command -v kind >/dev/null 2>&1; then
           echo "ERROR: kind not installed. 'brew install kind'." >&2
           exit 1
         fi
-      - kind create cluster --name {{.KIND_CLUSTER}} || true
-      - task: kind:install-cilium
-      - task: kind:install-kubevirt
-      - task: kind:install-forklift
-
-  down:
-    desc: Destroy the local kind cluster
-    cmds:
-      - kind delete cluster --name {{.KIND_CLUSTER}} || true
 
   install-cilium:
     desc: Install Cilium 1.19 on kind via the upstream Helm chart (NOT OLM — that is OpenShift only)
@@ -34,6 +52,21 @@ tasks:
           --namespace kube-system
           --set image.pullPolicy=IfNotPresent
           --set ipam.mode=kubernetes
+          --set hubble.enabled=true
+          --set hubble.relay.enabled=true
+          --set hubble.ui.enabled=true
+      - kubectl -n kube-system rollout status ds/cilium --timeout=300s
+
+  cilium-status:
+    desc: Print Cilium status from the cilium-dbg shipped with the daemonset
+    cmds:
+      - kubectl -n kube-system exec ds/cilium -- cilium-dbg status
+
+  hubble-ui:
+    desc: Port-forward the Hubble UI to http://localhost:12000
+    cmds:
+      - echo "Hubble UI will be available at http://localhost:12000"
+      - kubectl -n kube-system port-forward svc/hubble-ui 12000:80
 
   install-kubevirt:
     desc: Install KubeVirt + CDI on kind in software-emulation mode (Phase 4)

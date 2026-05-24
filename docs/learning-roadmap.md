@@ -104,9 +104,11 @@ Deliverables:
 - `gitops/apps/` and `gitops/overlays/` directory skeleton with at
   least one demonstrator app (e.g. `httpbin` or `podinfo`) deployed
   via an overlay.
-- `task kind:up` produces a Cilium 1.19 (Helm) + KubeVirt + Forklift
-  install on a fresh kind cluster. See
-  [ADR 0008](adr/0008-cilium-scope-split.md).
+- `task kind:up:cilium` produces a Cilium 1.19 (Helm) + Hubble install
+  on a fresh kind cluster for the Phase-2 learning loop;
+  `task kind:up:full` layers KubeVirt + Forklift on top for the Phase-4
+  exercises. See [ADR 0008](adr/0008-cilium-scope-split.md) and
+  [ADR 0009](adr/0009-kind-cilium-learning-cluster.md).
 - CRD schemas for `CiliumConfig`, `HyperConverged`, MTV `Provider`,
   MTV `Plan` fetched into `schemas/` so kubeconform validates them
   strict.
@@ -116,8 +118,8 @@ Acceptance:
 - [ ] `task spin:up:hub` followed by `task gitops:bootstrap:hub`
       produces a synced root Application within 10 minutes.
 - [ ] At least one demonstrator app reaches `Healthy` and `Synced`.
-- [ ] `task kind:up` produces a working Cilium install verified by
-      `cilium status`.
+- [ ] `task kind:up:cilium` produces a working Cilium install verified
+      by `task kind:cilium-status`.
 - [ ] `kustomize build gitops/overlays/<demo>/ | kubeconform -strict`
       green.
 
