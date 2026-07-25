@@ -1,0 +1,64 @@
+# Probe pods for the CUDN segment.
+#
+# Identical in spirit to 20-probe-pods.yaml, but attached to the CUDN-rendered
+# network "cudn-net" instead of a hand-written NAD. Note there is NO probe in
+# tenant-c: that namespace is not selected by the CUDN, so a pod referencing
+# cudn-net there would sit in ContainerCreating with a
+# "NetworkAttachmentDefinition not found" event. To demonstrate the namespace
+# gate deliberately, see scripts/run-demo.sh cudn-gate.
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: probe-db-cudn
+  namespace: tenant-a
+  labels:
+    app: probe
+    role: db
+  annotations:
+    k8s.v1.cni.cncf.io/networks: |-
+      [
+        {"name": "cudn-net", "interface": "net1"}
+      ]
+spec:
+  containers:
+    - name: probe
+      image: registry.access.redhat.com/ubi9/ubi:latest
+      command: ["/bin/bash", "-c"]
+      args:
+        - |
+          command -v nc >/dev/null 2>&1 || dnf install -y -q nmap-ncat iproute
+          nc -lk -p 5432 -e /bin/cat &
+          nc -lk -p 8080 -e /bin/cat &
+          sleep infinity
+      ports:
+        - containerPort: 5432
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: probe-app-cudn
+  namespace: tenant-b
+  labels:
+    app: probe
+    role: app
+  annotations:
+    k8s.v1.cni.cncf.io/networks: |-
+      [
+        {"name": "cudn-net", "interface": "net1"}
+      ]
+spec:
+  containers:
+    - name: probe
+      image: registry.access.redhat.com/ubi9/ubi:latest
+      command: ["/bin/bash", "-c"]
+      args:
+        - |
+          command -v nc >/dev/null 2>&1 || dnf install -y -q nmap-ncat iproute
+          nc -lk -p 5432 -e /bin/cat &
+          nc -lk -p 8080 -e /bin/cat &
+          sleep infinity
+      ports:
+        - containerPort: 5432
+        - containerPort: 8080

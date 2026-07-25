@@ -1,0 +1,34 @@
+# STEP (CUDN) 1 -- default deny on the CUDN-rendered network.
+#
+# Same object type and semantics as 00-deny-all-net-a.yaml. The ONLY
+# difference is the policy-for target: it references the CUDN-rendered NAD,
+# which is named after the CUDN ("cudn-net"), in each namespace. The rendered
+# NAD name equals the CUDN metadata.name.
+#
+# tenant-c is absent here on purpose -- it is not attached to this network.
+---
+apiVersion: k8s.cni.cncf.io/v1beta1
+kind: MultiNetworkPolicy
+metadata:
+  name: deny-all-cudn
+  namespace: tenant-a
+  annotations:
+    k8s.v1.cni.cncf.io/policy-for: tenant-a/cudn-net
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: k8s.cni.cncf.io/v1beta1
+kind: MultiNetworkPolicy
+metadata:
+  name: deny-all-cudn
+  namespace: tenant-b
+  annotations:
+    k8s.v1.cni.cncf.io/policy-for: tenant-b/cudn-net
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress

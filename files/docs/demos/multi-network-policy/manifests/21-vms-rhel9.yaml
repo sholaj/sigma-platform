@@ -1,0 +1,158 @@
+# RHEL 9 VMs -- the human-facing half of the demo.
+#
+# Two things to note:
+#
+# 1. LABELS GO ON spec.template.metadata.labels, not on the VirtualMachine.
+#    MultiNetworkPolicy selects the virt-launcher pod, and only template
+#    labels propagate there. Labelling the VM object does nothing.
+#
+# 2. FIREWALLD. The stock RHEL 9 image runs firewalld with only SSH open.
+#    A test against 5432 will fail with the policy permitting it, and you
+#    will lose twenty minutes debugging OVN. cloud-init below stops it and
+#    starts the listeners. Do not skip this.
+#
+# No database is installed and none is needed. MultiNetworkPolicy matches on
+# port number only -- it has no protocol awareness. A bare ncat listener is a
+# more reliable test subject than a real service.
+---
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: vm-db
+  namespace: tenant-a
+  labels:
+    app: mnp-demo
+spec:
+  running: true
+  dataVolumeTemplates:
+    - metadata:
+        name: vm-db-root
+      spec:
+        sourceRef:
+          kind: DataSource
+          name: rhel9
+          namespace: openshift-virtualization-os-images
+        storage:
+          resources:
+            requests:
+              storage: 30Gi
+  template:
+    metadata:
+      labels:
+        app: mnp-demo
+        role: db          # <-- selected by MultiNetworkPolicy
+    spec:
+      domain:
+        cpu:
+          cores: 1
+        memory:
+          guest: 2Gi
+        devices:
+          disks:
+            - name: rootdisk
+              disk:
+                bus: virtio
+            - name: cloudinit
+              disk:
+                bus: virtio
+          interfaces:
+            - name: default
+              masquerade: {}
+            - name: neta
+              bridge: {}
+            - name: netc
+              bridge: {}
+      networks:
+        - name: default
+          pod: {}
+        - name: neta
+          multus:
+            networkName: net-a
+        - name: netc
+          multus:
+            networkName: net-c
+      volumes:
+        - name: rootdisk
+          dataVolume:
+            name: vm-db-root
+        - name: cloudinit
+          cloudInitNoCloud:
+            userData: |-
+              #cloud-config
+              user: cloud-user
+              password: demo-only-rotate-me
+              chpasswd: { expire: false }
+              runcmd:
+                - systemctl stop firewalld
+                - systemctl disable firewalld
+                - dnf install -y nmap-ncat
+                - nohup ncat -lk 5432 -e /bin/cat &
+                - nohup ncat -lk 8080 -e /bin/cat &
+---
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: vm-app
+  namespace: tenant-b
+  labels:
+    app: mnp-demo
+spec:
+  running: true
+  dataVolumeTemplates:
+    - metadata:
+        name: vm-app-root
+      spec:
+        sourceRef:
+          kind: DataSource
+          name: rhel9
+          namespace: openshift-virtualization-os-images
+        storage:
+          resources:
+            requests:
+              storage: 30Gi
+  template:
+    metadata:
+      labels:
+        app: mnp-demo
+        role: app         # <-- selected by MultiNetworkPolicy
+    spec:
+      domain:
+        cpu:
+          cores: 1
+        memory:
+          guest: 2Gi
+        devices:
+          disks:
+            - name: rootdisk
+              disk:
+                bus: virtio
+            - name: cloudinit
+              disk:
+                bus: virtio
+          interfaces:
+            - name: default
+              masquerade: {}
+            - name: neta
+              bridge: {}
+      networks:
+        - name: default
+          pod: {}
+        - name: neta
+          multus:
+            networkName: net-a
+      volumes:
+        - name: rootdisk
+          dataVolume:
+            name: vm-app-root
+        - name: cloudinit
+          cloudInitNoCloud:
+            userData: |-
+              #cloud-config
+              user: cloud-user
+              password: demo-only-rotate-me
+              chpasswd: { expire: false }
+              runcmd:
+                - systemctl stop firewalld
+                - systemctl disable firewalld
+                - dnf install -y nmap-ncat
+                - nohup ncat -lk 5432 -e /bin/cat &

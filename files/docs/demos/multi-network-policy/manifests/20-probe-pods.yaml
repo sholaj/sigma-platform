@@ -1,0 +1,98 @@
+# Probe pods -- the automated half of the demo.
+#
+# Each probe attaches to net-a and net-b, and listens on TCP 5432 and 8080.
+# Two ports matter: the policy will permit 5432 and not 8080, which proves
+# port granularity rather than just host reachability.
+#
+# NOTE ON ICMP: OpenShift's restricted-v2 SCC drops NET_RAW, so classic ping
+# from inside these pods fails with EPERM regardless of network policy. The
+# scripted tests are therefore TCP-only. Use the VMs (21-vms-rhel9.yaml) for
+# the ICMP demonstration -- the guest kernel owns its own raw sockets, so
+# ping behaves normally there. See 30-scc-net-raw.yaml if pod ICMP is
+# genuinely required.
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: probe-db
+  namespace: tenant-a
+  labels:
+    app: probe
+    role: db
+  annotations:
+    k8s.v1.cni.cncf.io/networks: |-
+      [
+        {"name": "net-a", "interface": "net1"},
+        {"name": "net-b", "interface": "net2"}
+      ]
+spec:
+  containers:
+    - name: probe
+      image: registry.access.redhat.com/ubi9/ubi:latest
+      command: ["/bin/bash", "-c"]
+      args:
+        - |
+          command -v nc >/dev/null 2>&1 || dnf install -y -q nmap-ncat iproute
+          nc -lk -p 5432 -e /bin/cat &
+          nc -lk -p 8080 -e /bin/cat &
+          sleep infinity
+      ports:
+        - containerPort: 5432
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: probe-app
+  namespace: tenant-b
+  labels:
+    app: probe
+    role: app
+  annotations:
+    k8s.v1.cni.cncf.io/networks: |-
+      [
+        {"name": "net-a", "interface": "net1"},
+        {"name": "net-b", "interface": "net2"}
+      ]
+spec:
+  containers:
+    - name: probe
+      image: registry.access.redhat.com/ubi9/ubi:latest
+      command: ["/bin/bash", "-c"]
+      args:
+        - |
+          command -v nc >/dev/null 2>&1 || dnf install -y -q nmap-ncat iproute
+          nc -lk -p 5432 -e /bin/cat &
+          nc -lk -p 8080 -e /bin/cat &
+          sleep infinity
+      ports:
+        - containerPort: 5432
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: probe-rogue
+  namespace: tenant-c
+  labels:
+    app: probe
+    role: rogue
+  annotations:
+    k8s.v1.cni.cncf.io/networks: |-
+      [
+        {"name": "net-a", "interface": "net1"}
+      ]
+spec:
+  containers:
+    - name: probe
+      image: registry.access.redhat.com/ubi9/ubi:latest
+      command: ["/bin/bash", "-c"]
+      args:
+        - |
+          command -v nc >/dev/null 2>&1 || dnf install -y -q nmap-ncat iproute
+          nc -lk -p 5432 -e /bin/cat &
+          nc -lk -p 8080 -e /bin/cat &
+          sleep infinity
+      ports:
+        - containerPort: 5432
+        - containerPort: 8080

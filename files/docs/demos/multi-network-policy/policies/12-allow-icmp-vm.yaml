@@ -1,0 +1,33 @@
+# STEP 3 -- ICMP.
+#
+# There is no protocol field for ICMP in NetworkPolicy or MultiNetworkPolicy.
+# The mechanism is indirect: a rule with a "from" block and NO "ports" block
+# permits ALL protocols from that source, ICMP included. Add a ports block and
+# ICMP dies immediately, leaving only the named TCP port.
+#
+# Demonstrate this deliberately -- ping working, then adding a ports stanza and
+# ping stopping while the TCP test still passes. It reliably surprises people
+# and it is the clearest way to show that these objects are L3/L4 constructs,
+# not stateful firewall rules.
+#
+# Run this test between VMs, not pods. See notes in 20-probe-pods.yaml.
+---
+apiVersion: k8s.cni.cncf.io/v1beta1
+kind: MultiNetworkPolicy
+metadata:
+  name: allow-all-protocols-from-tenant-b
+  namespace: tenant-a
+  annotations:
+    k8s.v1.cni.cncf.io/policy-for: tenant-a/net-a
+spec:
+  podSelector:
+    matchLabels:
+      role: db
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: tenant-b
+      # No ports block -- ICMP and all TCP/UDP permitted from tenant-b.

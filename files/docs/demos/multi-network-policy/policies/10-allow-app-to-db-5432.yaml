@@ -1,0 +1,62 @@
+# STEP 2 -- selective cross-namespace allow.
+#
+# Permits ONLY role=app pods in tenant-b to reach role=db pods in tenant-a on
+# TCP 5432, over net-a. tenant-c stays blocked. Port 8080 stays blocked.
+#
+# YAML TRAP: namespaceSelector and podSelector below sit under the SAME list
+# item, which means AND (app pods in tenant-b). Give each its own "-" and it
+# becomes OR -- every pod in tenant-b, plus every app pod anywhere. This is
+# the second most common reason a demo looks broken.
+#
+# Egress is required as well as ingress, because 00-deny-all denied both
+# directions. Ingress alone will not restore the flow.
+---
+apiVersion: k8s.cni.cncf.io/v1beta1
+kind: MultiNetworkPolicy
+metadata:
+  name: allow-app-to-db-5432
+  namespace: tenant-a
+  annotations:
+    k8s.v1.cni.cncf.io/policy-for: tenant-a/net-a
+spec:
+  podSelector:
+    matchLabels:
+      role: db
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: tenant-b
+          podSelector:
+            matchLabels:
+              role: app
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+apiVersion: k8s.cni.cncf.io/v1beta1
+kind: MultiNetworkPolicy
+metadata:
+  name: allow-app-to-db-5432-egress
+  namespace: tenant-b
+  annotations:
+    k8s.v1.cni.cncf.io/policy-for: tenant-b/net-a
+spec:
+  podSelector:
+    matchLabels:
+      role: app
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: tenant-a
+          podSelector:
+            matchLabels:
+              role: db
+      ports:
+        - protocol: TCP
+          port: 5432

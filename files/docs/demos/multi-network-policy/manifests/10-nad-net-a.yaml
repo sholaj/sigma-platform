@@ -1,0 +1,64 @@
+# Network A -- shared localnet segment spanning all three namespaces.
+#
+# One NAD object per namespace. The "name" field is IDENTICAL in all three,
+# which is what places them on the same logical network. "netAttachDefName"
+# MUST match each object's own <namespace>/<name>.
+#
+# This is the segment the isolation demo operates on.
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: net-a
+  namespace: tenant-a
+spec:
+  config: |-
+    {
+      "cniVersion": "0.3.1",
+      "name": "net-a",
+      "type": "ovn-k8s-cni-overlay",
+      "topology": "localnet",
+      "netAttachDefName": "tenant-a/net-a",
+      "physicalNetworkName": "physnet",
+      "vlanID": 100,
+      "subnets": "10.100.0.0/24",
+      "excludeSubnets": "10.100.0.1/32"
+    }
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: net-a
+  namespace: tenant-b
+spec:
+  config: |-
+    {
+      "cniVersion": "0.3.1",
+      "name": "net-a",
+      "type": "ovn-k8s-cni-overlay",
+      "topology": "localnet",
+      "netAttachDefName": "tenant-b/net-a",
+      "physicalNetworkName": "physnet",
+      "vlanID": 100,
+      "subnets": "10.100.0.0/24",
+      "excludeSubnets": "10.100.0.1/32"
+    }
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: net-a
+  namespace: tenant-c
+spec:
+  config: |-
+    {
+      "cniVersion": "0.3.1",
+      "name": "net-a",
+      "type": "ovn-k8s-cni-overlay",
+      "topology": "localnet",
+      "netAttachDefName": "tenant-c/net-a",
+      "physicalNetworkName": "physnet",
+      "vlanID": 100,
+      "subnets": "10.100.0.0/24",
+      "excludeSubnets": "10.100.0.1/32"
+    }

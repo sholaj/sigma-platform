@@ -1,0 +1,43 @@
+# OPTIONAL -- only if ICMP from PODS (not VMs) is required.
+#
+# restricted-v2 drops NET_RAW, so ping inside a normal pod fails with EPERM.
+# That failure looks identical to a policy denial and will mislead the room.
+# Preferred approach is to demonstrate ICMP from the VMs instead.
+#
+# If you do need it, this grants NET_RAW and nothing else.
+---
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: restricted-v2-netraw
+allowPrivilegeEscalation: false
+allowPrivilegedContainer: false
+allowHostNetwork: false
+allowHostPorts: false
+allowHostPID: false
+allowHostIPC: false
+readOnlyRootFilesystem: false
+requiredDropCapabilities:
+  - ALL
+allowedCapabilities:
+  - NET_RAW
+runAsUser:
+  type: MustRunAsRange
+seLinuxContext:
+  type: MustRunAs
+seccompProfiles:
+  - runtime/default
+fsGroup:
+  type: MustRunAs
+supplementalGroups:
+  type: RunAsAny
+volumes:
+  - configMap
+  - downwardAPI
+  - emptyDir
+  - ephemeral
+  - persistentVolumeClaim
+  - projected
+  - secret
+users: []
+groups: []

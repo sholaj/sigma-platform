@@ -1,0 +1,22 @@
+# STEP 4 -- the two policy planes are independent.
+#
+# This is a STANDARD NetworkPolicy. It governs the default pod network and has
+# no effect whatsoever on net-a/net-b/net-c. Conversely, every
+# MultiNetworkPolicy in this directory has no effect on the default network.
+#
+# Apply this last and show that default-network traffic changes while the VLAN
+# behaviour is untouched. That contrast is the point of the whole exercise:
+# securing a cluster with secondary networks requires BOTH object types, and
+# an audit that only reviews NetworkPolicy has inspected half the estate.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-network-deny-ingress
+  namespace: tenant-a
+spec:
+  podSelector:
+    matchLabels:
+      role: db
+  policyTypes:
+    - Ingress

@@ -1,0 +1,53 @@
+# ClusterUserDefinedNetwork -- namespace-selector attach model.
+#
+# This is the alternative to the raw-NAD files (10/11/12). Instead of one NAD
+# object per namespace plus a per-pod networks annotation, a single
+# cluster-scoped CUDN selects namespaces by label and the CUDN controller
+# renders a NAD named after itself ("cudn-net") into each selected namespace.
+#
+# ATTACH GATING IS THE POINT. A namespace only gets the rendered NAD if it
+# matches namespaceSelector. tenant-a and tenant-b carry cudn-attach: "true"
+# (see 00-namespaces.yaml); tenant-c does not, so a pod there referencing this
+# network will fail to attach. That namespace-level gate is exactly what raw
+# NADs do NOT give you -- it is the answer to "why not attach namespaces to the
+# VLAN". You attach the namespace here, via the selector.
+#
+# Pods/VMs STILL opt in with the k8s.v1.cni.cncf.io/networks annotation
+# referencing the rendered NAD name ("cudn-net"). CUDN governs which namespaces
+# MAY attach; the workload annotation performs the attach. See 22-probe-pods-cudn.yaml.
+#
+# SUBNETS ARE DEFINED DELIBERATELY. MultiNetworkPolicy selector support on a
+# secondary network depends on whether subnets are set: with subnets, pod and
+# namespace selectors work (so the policy story matches net-a exactly). A
+# subnetless CUDN -- which is what you would use to maximise VM live-migration
+# flexibility -- restricts you toward ipBlock-style rules. That trade is a real
+# build decision; here we choose subnets so the policy demo is identical across
+# both attach models.
+#
+# Cluster-scoped and immutable: to change it, delete and recreate. The vlanID
+# MUST be unique across all localnet networks on this physnet -- do not reuse
+# net-a/b/c VLANs.
+---
+apiVersion: k8s.ovn.org/v1
+kind: ClusterUserDefinedNetwork
+metadata:
+  name: cudn-net
+spec:
+  namespaceSelector:
+    matchLabels:
+      cudn-attach: "true"
+  network:
+    topology: Localnet
+    localnet:
+      role: Secondary
+      physicalNetworkName: physnet
+      vlan:
+        mode: Access
+        access:
+          id: 110
+      subnets:
+        - "10.110.0.0/24"
+      excludeSubnets:
+        - "10.110.0.1/32"
+      ipam:
+        mode: Enabled

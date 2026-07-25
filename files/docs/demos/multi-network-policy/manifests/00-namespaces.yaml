@@ -1,0 +1,31 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tenant-a
+  labels:
+    mnp-demo: "true"
+    tenant: a
+    cudn-attach: "true"      # selected by the ClusterUserDefinedNetwork (13-)
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tenant-b
+  labels:
+    mnp-demo: "true"
+    tenant: b
+    cudn-attach: "true"      # selected by the ClusterUserDefinedNetwork (13-)
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tenant-c
+  labels:
+    mnp-demo: "true"
+    tenant: c
+    # No cudn-attach label -- deliberately NOT selected by the CUDN.
+    # Demonstrates that with CUDN, attachment is gated at the NAMESPACE level:
+    # a pod here referencing the CUDN network will fail to attach because the
+    # controller renders no NAD into an unselected namespace. Contrast with the
+    # raw-NAD model on net-a, where tenant-c attaches fine.

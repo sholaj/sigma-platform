@@ -1,0 +1,47 @@
+# STEP 1 -- default deny on net-a, in all three namespaces.
+#
+# The k8s.v1.cni.cncf.io/policy-for annotation is what binds the policy to a
+# NAD. Omit it and the object is accepted and silently does nothing. This is
+# the single most common reason a multi-network policy "doesn't work".
+#
+# Note the format: <namespace>/<nad-name>, referencing the NAD object in THIS
+# namespace, not the shared logical network name.
+---
+apiVersion: k8s.cni.cncf.io/v1beta1
+kind: MultiNetworkPolicy
+metadata:
+  name: deny-all-net-a
+  namespace: tenant-a
+  annotations:
+    k8s.v1.cni.cncf.io/policy-for: tenant-a/net-a
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: k8s.cni.cncf.io/v1beta1
+kind: MultiNetworkPolicy
+metadata:
+  name: deny-all-net-a
+  namespace: tenant-b
+  annotations:
+    k8s.v1.cni.cncf.io/policy-for: tenant-b/net-a
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: k8s.cni.cncf.io/v1beta1
+kind: MultiNetworkPolicy
+metadata:
+  name: deny-all-net-a
+  namespace: tenant-c
+  annotations:
+    k8s.v1.cni.cncf.io/policy-for: tenant-c/net-a
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress

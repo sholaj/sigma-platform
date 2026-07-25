@@ -1,0 +1,31 @@
+# STEP 2 (ALTERNATIVE) -- CIDR-based form of the same intent.
+#
+# Selector resolution on secondary networks is less battle-tested than on the
+# default network. If 10-allow-app-to-db-5432.yaml behaves unexpectedly, swap
+# to this. It is also closer to how an NSX-background audience thinks, which
+# can make it the better teaching artifact regardless.
+#
+# Apply EITHER 10- OR 11-, not both.
+---
+apiVersion: k8s.cni.cncf.io/v1beta1
+kind: MultiNetworkPolicy
+metadata:
+  name: allow-app-to-db-ipblock
+  namespace: tenant-a
+  annotations:
+    k8s.v1.cni.cncf.io/policy-for: tenant-a/net-a
+spec:
+  podSelector:
+    matchLabels:
+      role: db
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 10.100.0.0/24
+            except:
+              - 10.100.0.200/32
+      ports:
+        - protocol: TCP
+          port: 5432

@@ -1,0 +1,25 @@
+# REFERENCE ONLY -- apply only if OVN bridge mappings are not already present.
+#
+# Maps the OVN localnet physical network name to a host bridge carrying the
+# tagged trunk. Verify current state before applying:
+#
+#   oc get nncp
+#   oc debug node/<node> -- chroot /host ovs-vsctl get Open_vSwitch . \
+#     external_ids:ovn-bridge-mappings
+#
+# Applying this on a cluster that already has mappings can disrupt node
+# networking. Treat as a change-controlled action, not a demo step.
+---
+apiVersion: nmstate.io/v1
+kind: NodeNetworkConfigurationPolicy
+metadata:
+  name: mnp-demo-localnet-mapping
+spec:
+  nodeSelector:
+    node-role.kubernetes.io/worker: ""
+  desiredState:
+    ovn:
+      bridge-mappings:
+        - localnet: physnet
+          bridge: br-ex
+          state: present

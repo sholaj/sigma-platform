@@ -1,0 +1,60 @@
+# STEP (CUDN) 2 -- selective allow on the CUDN-rendered network.
+#
+# Identical intent to 10-allow-app-to-db-5432.yaml: tenant-b role=app reaches
+# tenant-a role=db on TCP 5432 only. The point of running it here is to prove
+# that the policy plane behaves the same regardless of attach model -- the
+# thing that changed is HOW the namespace joined the VLAN (selector vs per-pod
+# annotation), NOT how the policy binds or enforces.
+#
+# Ingress on the destination AND egress on the source, because the default-deny
+# covered both directions.
+---
+apiVersion: k8s.cni.cncf.io/v1beta1
+kind: MultiNetworkPolicy
+metadata:
+  name: allow-app-to-db-cudn
+  namespace: tenant-a
+  annotations:
+    k8s.v1.cni.cncf.io/policy-for: tenant-a/cudn-net
+spec:
+  podSelector:
+    matchLabels:
+      role: db
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: tenant-b
+          podSelector:
+            matchLabels:
+              role: app
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+apiVersion: k8s.cni.cncf.io/v1beta1
+kind: MultiNetworkPolicy
+metadata:
+  name: allow-app-to-db-cudn-egress
+  namespace: tenant-b
+  annotations:
+    k8s.v1.cni.cncf.io/policy-for: tenant-b/cudn-net
+spec:
+  podSelector:
+    matchLabels:
+      role: app
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: tenant-a
+          podSelector:
+            matchLabels:
+              role: db
+      ports:
+        - protocol: TCP
+          port: 5432
